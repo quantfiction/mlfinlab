@@ -7,3 +7,6 @@ test_reports
 docs/build/
 .local/
 cover/
+.vscode/
+/notebooks/
+mlfinlab.egg-info
