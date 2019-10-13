@@ -34,7 +34,7 @@ class BaseBars(ABC):
         self.flag = False  # The first flag is false since the first batch doesn't use the cache
         self.cache = []
 
-    def batch_run(self, verbose=True, to_csv=False, output_path=None):
+    def batch_run(self, inverse=False, verbose=True, to_csv=False, output_path=None):
         """
         Reads a csv file in batches and then constructs the financial data structure in the form of a DataFrame.
         The csv file must have only 3 columns: date_time, price, & volume.
@@ -64,7 +64,7 @@ class BaseBars(ABC):
             if verbose:  # pragma: no cover
                 print('Batch number:', count)
 
-            arr_bars = self._extract_bars(data=batch)
+            arr_bars = self._extract_bars(data=batch, inverse=inverse)
 
             if to_csv is True:
                 pd.DataFrame(arr_bars, columns=cols).to_csv(
@@ -94,10 +94,11 @@ class BaseBars(ABC):
         return None
 
     @abstractmethod
-    def _extract_bars(self, data):
+    def _extract_bars(self, data, inverse=False):
         """
         This method is required by all the bar types and is used to create the desired bars.
         :param data: (DataFrame) Contains 3 columns - date_time, price, and volume.
+        :param inverse (bool): Are contracts inverse or traditional
         :return: (List) of bars built using the current batch.
         """
 

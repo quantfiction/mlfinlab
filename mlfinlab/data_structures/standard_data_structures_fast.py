@@ -43,23 +43,37 @@ class StandardBars(BaseBars):
         self.cache_tuple = namedtuple('CacheData',
                                       ['date_time', 'price', 'high', 'low', 'cum_ticks', 'cum_volume', 'cum_dollar'])
 
-    def _extract_bars(self, data):
-        new_bar, cum_ticks, cum_dollar_value, cum_volume, high_price, low_price = self._update_counters()
+    def _extract_bars(self, data, inverse=False):
 
-        dt_arr = pd.to_datetime(data.iloc[:,0]).astype(np.int64).values
+        dt_arr = pd.to_datetime(data.iloc[:, 0]).astype(np.int64).values
         price_arr = data.iloc[:, 1].astype(float).values
         volume_arr = data.iloc[:, 2].astype(int).values
 
-        arr_bars, cache_tuple = self._iterate_bars(dt_arr=dt_arr, price_arr=price_arr, volume_arr=volume_arr, metric=self.metric,
-                                                   threshold=self.threshold, new_bar=new_bar, cum_ticks=cum_ticks, cum_dollar_value=cum_dollar_value,
-                                                   cum_volume=cum_volume, high_price=high_price, low_price=low_price)
+        new_bar, cum_ticks, cum_dollar_value, cum_volume, high_price, low_price = self._update_counters()
+
+        kwarg_dict = {
+            'metric': self.metric,
+            'threshold': self.threshold,
+            'inverse': inverse,
+            'dt_arr': dt_arr,
+            'price_arr': price_arr,
+            'volume_arr': volume_arr,
+            'new_bar': new_bar,
+            'cum_ticks': cum_ticks,
+            'cum_dollar_value': cum_dollar_value,
+            'cum_volume': cum_volume,
+            'high_price': high_price,
+            'low_price': low_price
+        }
+
+        arr_bars, cache_tuple = self._iterate_bars(**kwarg_dict)
 
         self.cache = () if np.inf in cache_tuple else self.cache_tuple(*cache_tuple)
         return arr_bars
 
     @staticmethod
     @jit(nopython=True)
-    def _iterate_bars(dt_arr, price_arr, volume_arr, metric, threshold, new_bar, cum_ticks, cum_dollar_value, cum_volume, high_price, low_price):
+    def _iterate_bars(metric, threshold, inverse, dt_arr, price_arr, volume_arr, new_bar, cum_ticks, cum_dollar_value, cum_volume, high_price, low_price):
         """
         For loop which compiles the various bars: dollar, volume, or tick.
 
@@ -86,7 +100,7 @@ class StandardBars(BaseBars):
 
             # Calculations
             cum_ticks += 1
-            dollar_value = price * volume
+            dollar_value = volume / price if inverse else price * volume
             cum_dollar_value = cum_dollar_value + dollar_value
             cum_volume += volume
 
@@ -144,24 +158,8 @@ class StandardBars(BaseBars):
 
         return new_bar, cum_ticks, cum_dollar_value, cum_volume, high_price, low_price
 
-    def _update_cache(self, date_time, price, low_price, high_price, cum_ticks, cum_volume, cum_dollar_value):
-        """
-        Update the cache which is used to create a continuous flow of bars from one batch to the next.
 
-        :param date_time: Timestamp of the bar
-        :param price: The current price
-        :param low_price: Lowest price in the period
-        :param high_price: Highest price in the period
-        :param cum_ticks: Cumulative number of ticks
-        :param cum_volume: Cumulative volume
-        :param cum_dollar_value: Cumulative dollar value
-        """
-        cache_data = self.cache_tuple(
-            date_time, price, high_price, low_price, cum_ticks, cum_volume, cum_dollar_value)
-        self.cache.append(cache_data)
-
-
-def get_dollar_bars(file_path, threshold=70000000, batch_size=20000000, verbose=True, to_csv=False, output_path=None):
+def get_dollar_bars(file_path, inverse=False, threshold=70000000, batch_size=20000000, verbose=True, to_csv=False, output_path=None):
     """
     Creates the dollar bars: date_time, open, high, low, close.
 
@@ -181,7 +179,7 @@ def get_dollar_bars(file_path, threshold=70000000, batch_size=20000000, verbose=
     bars = StandardBars(file_path=file_path, metric='cum_dollar_value',
                         threshold=threshold, batch_size=batch_size)
     dollar_bars = bars.batch_run(
-        verbose=verbose, to_csv=to_csv, output_path=output_path)
+        inverse=inverse, verbose=verbose, to_csv=to_csv, output_path=output_path)
     return dollar_bars
 
 
